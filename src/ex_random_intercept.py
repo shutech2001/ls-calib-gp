@@ -111,7 +111,7 @@ def run_simulation_one_scenario(
         uncalib_lower = np.quantile(samples, alpha / 2, axis=0)
         uncalib_upper = np.quantile(samples, 1 - alpha / 2, axis=0)
 
-        # # Locaiton-Scale Calibrated
+        # # Location-Scale Calibrated
         calib_mean = np.mean(samples_calib, axis=0)
         calib_lower = np.quantile(samples_calib, alpha / 2, axis=0)
         calib_upper = np.quantile(samples_calib, 1 - alpha / 2, axis=0)
@@ -306,7 +306,7 @@ def print_results(results: Dict) -> None:
     print("\n" + "=" * 80)
     print("SIMULATION RESULTS")
     print("=" * 80)
-    print(f"\n{'Metric':<30} {'Uncalib':<12} {'Calibrated':<12} {'Frequentist':<12}")
+    print(f"\n{'Metric':<30} {'Uncalibrated':<12} {'Location-Scale Calibrated':<12} {'Frequentist':<12}")
     print("-" * 80)
     print(
         f"{'Coverage Probability':<30} "
@@ -335,9 +335,9 @@ def print_results(results: Dict) -> None:
     print("=" * 80)
     print("\nNote: Target coverage probability is 0.95 (alpha=0.05)")
     print("\nMethods:")
-    print("  - Uncalibrated: Bayesian posterior with learning rate eta")
-    print("  - Calibrated  : Bayesian posterior + sandwich variance calibration")
-    print("  - Frequentist : Frequentist LMM")
+    print("  - Uncalibrated             : Bayesian posterior with learning rate eta")
+    print("  - Location-Scale Calibrated: Bayesian posterior + location-scale calibration")
+    print("  - Frequentist              : Frequentist LMM")
     print("=" * 80)
 
 
