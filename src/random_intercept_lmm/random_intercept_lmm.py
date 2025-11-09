@@ -91,14 +91,14 @@ class RandomInterceptLMM:
         return Sigma_i
 
     def compute_posterior(self, y_deque: Deque, X_deque: Deque) -> Tuple[NDArray, NDArray]:
-        """Compute the posterior mean and precision matrix.
+        """Compute the posterior mean and covariance matrix.
 
         Args:
             y_deque (Deque): A deque containing the response vectors.
             X_deque (Deque): A deque containing the design matrices.
 
         Returns:
-            Tuple[NDArray, NDArray]: A tuple containing the posterior mean and precision matrix.
+            Tuple[NDArray, NDArray]: A tuple containing the posterior mean and covariance matrix.
         """
         Sigma_i = self.compute_Sigma_i()
         Sigma_i_inv = np.linalg.inv(Sigma_i)
@@ -128,7 +128,7 @@ class RandomInterceptLMM:
         Returns:
             NDArray: Samples from the posterior distribution.
         """
-        samples = np.random.multivariate_normal(m_post, np.linalg.inv(Lambda_post_inv), size=M)
+        samples = np.random.multivariate_normal(m_post, Lambda_post_inv, size=M)
         return samples
 
     def compute_U_n(self, beta: NDArray, y_deque: Deque, X_deque: Deque) -> NDArray:

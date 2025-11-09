@@ -92,7 +92,7 @@ def run_simulation_one_scenario(
         beta_dagger = model.compute_one_step_center(beta_GB, y_deque, X_deque)
 
         # Compute calibration matrix
-        Omega, V_target_hat = model.compute_calibration_matrix(beta_GB, beta_dagger, samples, y_deque, X_deque)
+        Omega, _ = model.compute_calibration_matrix(beta_GB, beta_dagger, samples, y_deque, X_deque)
 
         # Calibrate samples
         samples_calib = model.calibrate_samples(samples, beta_GB, beta_dagger, Omega)
@@ -369,7 +369,7 @@ if __name__ == "__main__":
             n_per_group=args.n_per_group,
             p=args.p,
             eta=args.eta,
-            M_samples=args.M_samples,
+            M_samples=args.M,
             alpha=args.alpha,
             seed=args.seed,
             verbose=args.verbose,
@@ -385,7 +385,7 @@ if __name__ == "__main__":
             n_per_group=args.n_per_group,
             p=args.p,
             eta=args.eta,
-            M_samples=args.M_samples,
+            M_samples=args.M,
             alpha=args.alpha,
             seed=args.seed,
             verbose=args.verbose,
