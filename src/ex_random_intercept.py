@@ -345,21 +345,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run a simulation of the random intercept LMM with Bayesian posterior and sandwich variance calibration."  # noqa: E501
     )
-    parser.add_argument("--n_sim", type=int, default=500, help="Number of simulations.")
+    parser.add_argument("--n_sim", "--N", type=int, default=500, help="Number of simulations.")
     parser.add_argument("--J", type=int, default=60, help="Number of groups.")
-    parser.add_argument("--n_per_group", type=int, default=5, help="Number of observations per group.")
+    parser.add_argument("--n_per_group", "--NG", type=int, default=5, help="Number of observations per group.")
     parser.add_argument("--p", type=int, default=1, help="Dimension of covariates.")
-    parser.add_argument("--M_samples", type=int, default=1000, help="Number of samples from the posterior.")
+    parser.add_argument("--M", type=int, default=1000, help="Number of samples from the posterior.")
     parser.add_argument("--alpha", type=float, default=0.05, help="Significance level.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
-    parser.add_argument("--verbose", action="store_true", help="Whether to print verbose output.")
+    parser.add_argument("--verbose", type=bool, default=False, help="Whether to print verbose output.")
 
-    parser.add_argument("--one_scenario", action="store_true", help="Whether to run a single scenario.")
-    parser.add_argument("--eta", type=float, default=1.0, help="Learning rate for running a single scenario.")
+    parser.add_argument("--one_scenario", "--OS", type=bool, default=False, help="Whether to run a single scenario.")
+    parser.add_argument("--eta", "--LR", type=float, default=1.0, help="Learning rate for running a single scenario.")
 
-    parser.add_argument("--min_learning_rate", type=float, default=0.01, help="Minimum learning rate.")
-    parser.add_argument("--max_learning_rate", type=float, default=100.0, help="Maximum learning rate.")
-    parser.add_argument("--n_learning_rates", type=int, default=20, help="Number of learning rates.")
+    parser.add_argument("--min_learning_rate", "--minLR", type=float, default=0.01, help="Minimum learning rate.")
+    parser.add_argument("--max_learning_rate", "--maxLR", type=float, default=100.0, help="Maximum learning rate.")
+    parser.add_argument("--n_learning_rates", "--NLR", type=int, default=20, help="Number of learning rates.")
     args = parser.parse_args()
 
     if args.one_scenario:
