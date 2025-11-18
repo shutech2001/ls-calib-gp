@@ -333,7 +333,6 @@ def print_results(results: Dict) -> None:
         f"{results['bias_sd_frequentist']:.4f}"
     )
     print("=" * 80)
-    print("\nNote: Target coverage probability is 0.95 (alpha=0.05)")
     print("\nMethods:")
     print("  - Uncalibrated             : Bayesian posterior with learning rate eta")
     print("  - Location-Scale Calibrated: Bayesian posterior + location-scale calibration")
@@ -490,6 +489,6 @@ if __name__ == "__main__":
                 "{" + " ".join(f"({xi},{yi})" for xi, yi in zip(results["etas"], results["bias_sd_calibrated"])) + "}"
             )
             f.write(out_calib + "\n")
-        print(
+        logging.info(
             "Results written to lmm_output/coverage_output.tex, lmm_output/width_output.tex, lmm_output/bias_output.tex, and lmm_output/bias_sd_output.tex"  # noqa: E501
         )
