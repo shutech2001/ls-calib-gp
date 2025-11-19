@@ -3,129 +3,142 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
+from numpy.typing import NDArray
 
-from random_intercept_lmm import RandomInterceptLMM
+from huber_random_intercept import HuberRandomIntercept
 
 
 def run_simulation_one_scenario(
-    n_sim: int = 500,
-    J: int = 60,
+    n_sim: int = 200,
+    G: int = 100,
     n_per_group: int = 5,
     p: int = 1,
+    beta_true: Optional[NDArray[np.float64]] = None,
+    G_large: int = 5000,
+    large_replication: int = 1000,
+    beta_pseudo_true: Optional[NDArray[np.float64]] = None,
+    tau: float = 1.0,
+    sigma: float = 1.0,
+    c: float = 1.0,
     eta: float = 1.0,
-    M_samples: int = 1000,
+    lam: float = 0.1,
+    outlier_prob: float = 0.1,
+    outlier_scale: float = 10.0,
+    n_iter: int = 1000,
+    n_burn_in: int = 500,
     alpha: float = 0.05,
     seed: int = 42,
     do_freq: bool = True,
-    verbose: bool = False,
+    verbose: bool = True,
 ) -> Dict:
-    """Run a simulation for a given scenario.
+    if beta_true is None:
+        beta_true = np.array([2.0])
 
-    Args:
-        n_sim (int, optional): Number of simulations. Defaults to 500.
-        J (int, optional): Number of groups. Defaults to 60.
-        n_per_group (int, optional): Number of observations per group. Defaults to 5.
-        p (int, optional): Number of covariates. Defaults to 1.
-        eta (float, optional): Learning rate. Defaults to 1.0.
-        M_samples (int, optional): Number of samples from the posterior. Defaults to 1000.
-        alpha (float, optional): Significance level. Defaults to 0.05.
-        seed (int, optional): Random seed. Defaults to 42.
-        do_freq (bool, optional): Whether to fit a frequentist LMM. Defaults to True.
-        verbose (bool, optional): Whether to print verbose output. Defaults to False.
-
-    Returns:
-        Dict: A dictionary containing the simulation results.
-            - coverage_uncalibrated (float): Coverage probability of the uncalibrated intervals.
-            - coverage_calibrated (float): Coverage probability of the calibrated intervals.
-            - coverage_frequentist (float): Coverage probability of the frequentist intervals.
-            - width_uncalibrated (float): Average width of the uncalibrated intervals.
-            - width_calibrated (float): Average width of the calibrated intervals.
-            - width_frequentist (float): Average width of the frequentist intervals.
-            - bias_uncalibrated (float): Average bias of the uncalibrated intervals.
-            - bias_calibrated (float): Average bias of the calibrated intervals.
-            - bias_frequentist (float): Average bias of the frequentist intervals.
-            - bias_sd_uncalibrated (float): Standard deviation of the bias of the uncalibrated intervals.
-            - bias_sd_calibrated (float): Standard deviation of the bias of the calibrated intervals.
-            - bias_sd_frequentist (float): Standard deviation of the bias of the frequentist intervals.
-    """
     np.random.seed(seed)
-
-    # True parameters
-    beta_true = np.ones(p)
-    tau = 1.0
-    sigma = 1.0
 
     # Storage for results
     coverage_uncalib = np.zeros(n_sim)
     coverage_calib = np.zeros(n_sim)
     coverage_freq = np.zeros(n_sim)
+
     width_uncalib = np.zeros(n_sim)
     width_calib = np.zeros(n_sim)
     width_freq = np.zeros(n_sim)
+
     bias_uncalib = np.zeros(n_sim)
     bias_calib = np.zeros(n_sim)
     bias_freq = np.zeros(n_sim)
+
+    model = HuberRandomIntercept(
+        G=G,
+        n_per_group=n_per_group,
+        p=p,
+        beta_true=beta_true,
+        tau=tau,
+        sigma=sigma,
+        c=c,
+        eta=eta,
+        lam=lam,
+    )
+
+    if beta_pseudo_true is None:
+        beta_pseudo_true = model.compute_pseudo_true_beta_lambda(
+            G_large=G_large,
+            large_replication=large_replication,
+            outlier_prob=outlier_prob,
+            outlier_scale=outlier_scale,
+            seed=seed,
+            verbose=verbose,
+        )
+    else:
+        beta_pseudo_true = np.asarray(beta_pseudo_true)
+    if verbose:
+        logging.info(f"True beta: {beta_true}")
+        logging.info(f"Pseudo-true beta: {beta_pseudo_true}")
 
     for sim in range(n_sim):
         if verbose:
             logging.info(f"Running simulation {sim + 1} of {n_sim}...")
 
-        # Initialize model
-        model = RandomInterceptLMM(
-            J=J, n_per_group=n_per_group, p=p, beta_true=beta_true, tau=tau, sigma=sigma, eta=eta
+        # Generate data
+        y_deque, X_deque = model.generate_data(
+            seed=seed + sim * 1000,
+            outlier_prob=outlier_prob,
+            outlier_scale=outlier_scale,
         )
 
-        # Generate data
-        y_deque, X_deque = model.generate_data(seed=seed + sim * 10)
+        # Run MCMC
+        beta_samples, _, _ = model.gibbs_sampler(
+            y_deque=y_deque,
+            X_deque=X_deque,
+            n_iter=n_iter,
+            n_burn_in=n_burn_in,
+            seed=seed + sim * 1000 + 1,
+        )
 
-        # Compute posterior
-        m_post, Lambda_post_inv = model.compute_posterior(y_deque, X_deque)
+        # Uncalibrated posterior
+        beta_GB = np.mean(beta_samples, axis=0)
+        uncalib_lower = np.quantile(beta_samples, alpha / 2, axis=0)
+        uncalib_upper = np.quantile(beta_samples, 1 - alpha / 2, axis=0)
 
-        # Sample from posterior
-        samples = model.sample_posterior(m_post, Lambda_post_inv, M_samples)
+        # Compute one-step center and calibrate
+        beta_dagger, _, _ = model.fit_frequentist_penalized_ee(y_deque, X_deque, alpha)
+        Omega, _ = model.compute_calibration_matrix(beta_GB, beta_dagger, beta_samples, y_deque, X_deque)
+        beta_samples_calib = model.calibrate_samples(beta_samples, beta_GB, beta_dagger, Omega)
 
-        # Compute admissible center (here, one-step center)
-        beta_GB = m_post
-        beta_dagger = model.compute_one_step_center(beta_GB, y_deque, X_deque)
+        # Calibrated posterior
+        beta_calib_mean = np.mean(beta_samples_calib, axis=0)
+        calib_lower = np.quantile(beta_samples_calib, alpha / 2, axis=0)
+        calib_upper = np.quantile(beta_samples_calib, 1 - alpha / 2, axis=0)
 
-        # Compute calibration matrix
-        Omega, V_target_hat = model.compute_calibration_matrix(beta_GB, beta_dagger, samples, y_deque, X_deque)
-
-        # Calibrate samples
-        samples_calib = model.calibrate_samples(samples, beta_GB, beta_dagger, Omega)
-
-        # Fit frequentist LMM
+        # Frequentist estimation
         if do_freq:
-            beta_freq, freq_lower, freq_upper = model.fit_frequentist_lmm(y_deque, X_deque, alpha)
+            beta_freq, freq_lower, freq_upper = model.fit_frequentist_penalized_ee(
+                y_deque=y_deque,
+                X_deque=X_deque,
+                alpha=alpha,
+            )
         else:
             beta_freq = None
             freq_lower = None
             freq_upper = None
 
-        # Compute intervals
-        # # Uncalibrated
-        uncalib_mean = np.mean(samples, axis=0)
-        uncalib_lower = np.quantile(samples, alpha / 2, axis=0)
-        uncalib_upper = np.quantile(samples, 1 - alpha / 2, axis=0)
-
-        # # Location-Scale Calibrated
-        calib_mean = np.mean(samples_calib, axis=0)
-        calib_lower = np.quantile(samples_calib, alpha / 2, axis=0)
-        calib_upper = np.quantile(samples_calib, 1 - alpha / 2, axis=0)
-
-        # Compute metrics (for first component when p=1)
+        # Compute metrics (for first component)
         idx = 0
-        coverage_uncalib[sim] = np.mean(uncalib_lower[idx] <= beta_true[idx] <= uncalib_upper[idx])
-        coverage_calib[sim] = np.mean(calib_lower[idx] <= beta_true[idx] <= calib_upper[idx])
+
+        # Coverage
+        coverage_uncalib[sim] = uncalib_lower[idx] <= beta_pseudo_true[idx] <= uncalib_upper[idx]
+        coverage_calib[sim] = calib_lower[idx] <= beta_pseudo_true[idx] <= calib_upper[idx]
         if do_freq:
             assert freq_lower is not None and freq_upper is not None
-            coverage_freq[sim] = np.mean(freq_lower[idx] <= beta_true[idx] <= freq_upper[idx])
+            coverage_freq[sim] = freq_lower[idx] <= beta_pseudo_true[idx] <= freq_upper[idx]
         else:
             coverage_freq[sim] = np.nan
 
+        # Width
         width_uncalib[sim] = uncalib_upper[idx] - uncalib_lower[idx]
         width_calib[sim] = calib_upper[idx] - calib_lower[idx]
         if do_freq:
@@ -134,15 +147,17 @@ def run_simulation_one_scenario(
         else:
             width_freq[sim] = np.nan
 
-        bias_uncalib[sim] = uncalib_mean[idx] - beta_true[idx]
-        bias_calib[sim] = calib_mean[idx] - beta_true[idx]
+        # Bias
+        bias_uncalib[sim] = beta_GB[idx] - beta_pseudo_true[idx]
+        bias_calib[sim] = beta_calib_mean[idx] - beta_pseudo_true[idx]
         if do_freq:
             assert beta_freq is not None
-            bias_freq[sim] = beta_freq[idx] - beta_true[idx]
+            bias_freq[sim] = beta_freq[idx] - beta_pseudo_true[idx]
         else:
             bias_freq[sim] = np.nan
 
     return {
+        "beta_pseudo_true": beta_pseudo_true,
         "coverage_uncalibrated": np.mean(coverage_uncalib),
         "coverage_calibrated": np.mean(coverage_calib),
         "coverage_frequentist": np.mean(coverage_freq),
@@ -152,9 +167,9 @@ def run_simulation_one_scenario(
         "bias_uncalibrated": np.mean(bias_uncalib),
         "bias_calibrated": np.mean(bias_calib),
         "bias_frequentist": np.mean(bias_freq),
-        "bias_sd_uncalibrated": np.std(bias_uncalib),
-        "bias_sd_calibrated": np.std(bias_calib),
-        "bias_sd_frequentist": np.std(bias_freq),
+        "bias_sd_uncalibrated": np.std(bias_uncalib, ddof=1),
+        "bias_sd_calibrated": np.std(bias_calib, ddof=1),
+        "bias_sd_frequentist": np.std(bias_freq, ddof=1),
     }
 
 
@@ -162,52 +177,25 @@ def run_simulation_varying_learning_rate(
     min_learning_rate: float = 0.01,
     max_learning_rate: float = 100.0,
     n_learning_rates: int = 20,
-    n_sim: int = 500,
-    J: int = 60,
+    n_sim: int = 200,
+    G: int = 100,
     n_per_group: int = 5,
     p: int = 1,
-    eta: float = 1.0,
-    M_samples: int = 1000,
+    beta_true: Optional[NDArray[np.float64]] = None,
+    G_large: int = 5000,
+    large_replication: int = 1000,
+    tau: float = 1.0,
+    sigma: float = 1.0,
+    c: float = 1.0,
+    lam: float = 0.1,
+    outlier_prob: float = 0.1,
+    outlier_scale: float = 10.0,
+    n_iter: int = 1000,
+    n_burn_in: int = 500,
     alpha: float = 0.05,
     seed: int = 42,
-    verbose: bool = False,
+    verbose: bool = True,
 ) -> Dict:
-    """Run a simulation varying the learning rate.
-
-    Args:
-        min_learning_rate (float, optional): Minimum learning rate. Defaults to 0.01.
-        max_learning_rate (float, optional): Maximum learning rate. Defaults to 100.0.
-        n_learning_rates (int, optional): Number of learning rates. Defaults to 20.
-        n_sim (int, optional): Number of simulations. Defaults to 500.
-        J (int, optional): Number of groups. Defaults to 60.
-        n_per_group (int, optional): Number of observations per group. Defaults to 5.
-        p (int, optional): Number of covariates. Defaults to 1.
-        eta (float, optional): Learning rate. Defaults to 1.0.
-        M_samples (int, optional): Number of samples from the posterior. Defaults to 1000.
-        alpha (float, optional): Significance level. Defaults to 0.05.
-        seed (int, optional): Random seed. Defaults to 42.
-        verbose (bool, optional): Whether to print verbose output. Defaults to False.
-
-    Returns:
-        Dict: A dictionary containing the simulation results.
-            - etas (List[float]): List of learning rates.
-            - coverage_uncalibrated (List[float]):
-                Coverage probability of the uncalibrated intervals for each learning rate.
-            - coverage_calibrated (List[float]):
-                Coverage probability of the calibrated intervals for each learning rate.
-            - coverage_frequentist (float): Coverage probability of the frequentist intervals.
-            - width_uncalibrated (List[float]): Average width of the uncalibrated intervals for each learning rate.
-            - width_calibrated (List[float]): Average width of the calibrated intervals for each learning rate.
-            - width_frequentist (float): Average width of the frequentist intervals.
-            - bias_uncalibrated (List[float]): Average bias of the uncalibrated intervals for each learning rate.
-            - bias_calibrated (List[float]): Average bias of the calibrated intervals for each learning rate.
-            - bias_frequentist (float): Average bias of the frequentist intervals.
-            - bias_sd_uncalibrated (List[float]):
-                Standard deviation of the bias of the uncalibrated intervals for each learning rate.
-            - bias_sd_calibrated (List[float]):
-                Standard deviation of the bias of the calibrated intervals for each learning rate.
-            - bias_sd_frequentist (float): Standard deviation of the bias of the frequentist intervals.
-    """
     etas = np.logspace(np.log10(min_learning_rate), np.log10(max_learning_rate), n_learning_rates)
 
     coverage_uncalib = np.zeros(n_learning_rates)
@@ -225,22 +213,36 @@ def run_simulation_varying_learning_rate(
     bias_freq = 0
     bias_sd_freq = 0
 
+    # storage for beta_pseudo_true
+    beta_pseudo_true = None
+
     for i, eta in enumerate(etas):
         if verbose:
             logging.info(f"Running simulation with learning rate {eta}...")
         if i == 0:
             results = run_simulation_one_scenario(
                 n_sim=n_sim,
-                J=J,
+                G=G,
                 n_per_group=n_per_group,
                 p=p,
+                beta_true=beta_true,
+                G_large=G_large,
+                large_replication=large_replication,
+                tau=tau,
+                sigma=sigma,
+                c=c,
                 eta=eta,
-                M_samples=M_samples,
+                lam=lam,
+                outlier_prob=outlier_prob,
+                outlier_scale=outlier_scale,
+                n_iter=n_iter,
+                n_burn_in=n_burn_in,
                 alpha=alpha,
                 seed=seed,
                 do_freq=True,
                 verbose=verbose,
             )
+            beta_pseudo_true = results["beta_pseudo_true"]
             coverage_freq = results["coverage_frequentist"]
             width_freq = results["width_frequentist"]
             bias_freq = results["bias_frequentist"]
@@ -248,11 +250,20 @@ def run_simulation_varying_learning_rate(
         else:
             results = run_simulation_one_scenario(
                 n_sim=n_sim,
-                J=J,
+                G=G,
                 n_per_group=n_per_group,
                 p=p,
+                beta_true=beta_true,
+                beta_pseudo_true=beta_pseudo_true,
+                tau=tau,
+                sigma=sigma,
+                c=c,
                 eta=eta,
-                M_samples=M_samples,
+                lam=lam,
+                outlier_prob=outlier_prob,
+                outlier_scale=outlier_scale,
+                n_iter=n_iter,
+                n_burn_in=n_burn_in,
                 alpha=alpha,
                 seed=seed,
                 do_freq=False,
@@ -286,27 +297,10 @@ def run_simulation_varying_learning_rate(
 
 
 def print_results(results: Dict) -> None:
-    """Print the simulation results.
-
-    Args:
-        results (Dict): A dictionary containing the simulation results.
-            - coverage_uncalibrated (float): Coverage probability of the uncalibrated intervals.
-            - coverage_calibrated (float): Coverage probability of the calibrated intervals.
-            - coverage_frequentist (float): Coverage probability of the frequentist intervals.
-            - width_uncalibrated (float): Average width of the uncalibrated intervals.
-            - width_calibrated (float): Average width of the calibrated intervals.
-            - width_frequentist (float): Average width of the frequentist intervals.
-            - bias_uncalibrated (float): Average bias of the uncalibrated intervals.
-            - bias_calibrated (float): Average bias of the calibrated intervals.
-            - bias_frequentist (float): Average bias of the frequentist intervals.
-            - bias_sd_uncalibrated (float): Standard deviation of the bias of the uncalibrated intervals.
-            - bias_sd_calibrated (float): Standard deviation of the bias of the calibrated intervals.
-            - bias_sd_frequentist (float): Standard deviation of the bias of the frequentist intervals.
-    """
     print("\n" + "=" * 80)
-    print("SIMULATION RESULTS")
+    print("SIMULATION RESULTS - HUBER RANDOM INTERCEPT")
     print("=" * 80)
-    print(f"\n{'Metric':<30} {'Uncalibrated':<12} {'Location-Scale Calibrated':<12} {'Frequentist':<12}")
+    print(f"\n{'Metric':<30} {'Uncalibrated':<12} {'Calibrated':<12} {'Frequentist':<12}")
     print("-" * 80)
     print(
         f"{'Coverage Probability':<30} "
@@ -333,7 +327,6 @@ def print_results(results: Dict) -> None:
         f"{results['bias_sd_frequentist']:.4f}"
     )
     print("=" * 80)
-    print("\nNote: Target coverage probability is 0.95 (alpha=0.05)")
     print("\nMethods:")
     print("  - Uncalibrated             : Bayesian posterior with learning rate eta")
     print("  - Location-Scale Calibrated: Bayesian posterior + location-scale calibration")
@@ -341,35 +334,89 @@ def print_results(results: Dict) -> None:
     print("=" * 80)
 
 
+def parse_beta(beta_str: str) -> NDArray:
+    """Generate an NDArray from a comma-separated string
+
+    Args:
+        beta_str (str): comma-separated parameter (e.g., 5.0,3.5)
+
+    Returns:
+        NDArray: true coefficient vector
+    """
+    try:
+        beta_list: list[float] = [float(b.strip()) for b in beta_str.split(",")]
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("beta_true must be a comma-separated list of numbers. (e.g., 5.0,3.5)") from e
+    return np.array(beta_list)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run a simulation of the random intercept LMM with Bayesian posterior and sandwich variance calibration."  # noqa: E501
+        description="Run a simulation of the Huber random intercept model with n-dependent Gaussian prior."
     )
-    parser.add_argument("--n_sim", "--N", type=int, default=500, help="Number of simulations.")
-    parser.add_argument("--J", type=int, default=60, help="Number of groups.")
-    parser.add_argument("--n_per_group", "--NG", type=int, default=5, help="Number of observations per group.")
-    parser.add_argument("--p", type=int, default=1, help="Dimension of covariates.")
-    parser.add_argument("--M", type=int, default=1000, help="Number of samples from the posterior.")
-    parser.add_argument("--alpha", type=float, default=0.05, help="Significance level.")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed.")
-    parser.add_argument("--verbose", type=bool, default=False, help="Whether to print verbose output.")
+    parser.add_argument("--n_sim", "--N", type=int, default=200, help="Number of simulations (default: 200).")
+    parser.add_argument("--G", type=int, default=100, help="Number of groups (default: 100).")
+    parser.add_argument(
+        "--n_per_group", "--NG", type=int, default=5, help="Number of observations per group (default: 5)."
+    )
+    parser.add_argument("--p", type=int, default=1, help="Dimension of covariates (default: 1).")
+    parser.add_argument("--beta_true", type=parse_beta, default="2.0", help="True coefficients (default: 2.0).")
+    parser.add_argument(
+        "--G_large", type=int, default=5000, help="Number of groups for pseudo-true beta (default: 5000)."
+    )
+    parser.add_argument(
+        "--large_replication",
+        type=int,
+        default=1000,
+        help="Number of replications for pseudo-true beta (default: 1000).",
+    )
+    parser.add_argument("--tau", type=float, default=1.0, help="True random intercept variance (default: 1.0).")
+    parser.add_argument("--sigma", type=float, default=1.0, help="True residual variance (default: 1.0).")
+    parser.add_argument("--c", type=float, default=1.0, help="Huber tuning parameter (default: 1.0).")
+    parser.add_argument("--lam", type=float, default=0.1, help="Ridge penalty parameter (default: 0.1).")
+    parser.add_argument("--outlier_prob", type=float, default=0.1, help="Outlier probability (default: 0.1).")
+    parser.add_argument("--outlier_scale", type=float, default=10.0, help="Outlier scale (default: 10.0).")
+    parser.add_argument("--n_iter", type=int, default=1000, help="Number of Gibbs iterations (default: 1000).")
+    parser.add_argument("--n_burn_in", type=int, default=500, help="Number of burn-in iterations (default: 500).")
+    parser.add_argument("--alpha", type=float, default=0.05, help="Significance level (default: 0.05).")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--verbose", type=bool, default=False, help="Whether to print verbose output (default: False).")
 
-    parser.add_argument("--one_scenario", "--OS", type=bool, default=False, help="Whether to run a single scenario.")
-    parser.add_argument("--eta", "--LR", type=float, default=1.0, help="Learning rate for running a single scenario.")
+    parser.add_argument(
+        "--one_scenario", "--OS", type=bool, default=False, help="Whether to run a single scenario (default: False)."
+    )
+    parser.add_argument("--eta", "--LR", type=float, default=1.0, help="Learning rate (default: 1.0).")
 
-    parser.add_argument("--min_learning_rate", "--minLR", type=float, default=0.01, help="Minimum learning rate.")
-    parser.add_argument("--max_learning_rate", "--maxLR", type=float, default=100.0, help="Maximum learning rate.")
-    parser.add_argument("--n_learning_rates", "--NLR", type=int, default=20, help="Number of learning rates.")
+    parser.add_argument(
+        "--min_learning_rate", "--minLR", type=float, default=0.01, help="Minimum learning rate (default: 0.01)."
+    )
+    parser.add_argument(
+        "--max_learning_rate", "--maxLR", type=float, default=100.0, help="Maximum learning rate (default: 100.0)."
+    )
+    parser.add_argument(
+        "--n_learning_rates", "--NLR", type=int, default=20, help="Number of learning rates (default: 20)."
+    )
+
     args = parser.parse_args()
 
     if args.one_scenario:
         results = run_simulation_one_scenario(
             n_sim=args.n_sim,
-            J=args.J,
+            G=args.G,
             n_per_group=args.n_per_group,
             p=args.p,
+            beta_true=args.beta_true,
+            G_large=args.G_large,
+            large_replication=args.large_replication,
+            tau=args.tau,
+            sigma=args.sigma,
+            c=args.c,
             eta=args.eta,
-            M_samples=args.M_samples,
+            lam=args.lam,
+            outlier_prob=args.outlier_prob,
+            outlier_scale=args.outlier_scale,
+            n_iter=args.n_iter,
+            n_burn_in=args.n_burn_in,
             alpha=args.alpha,
             seed=args.seed,
             verbose=args.verbose,
@@ -381,18 +428,27 @@ if __name__ == "__main__":
             max_learning_rate=args.max_learning_rate,
             n_learning_rates=args.n_learning_rates,
             n_sim=args.n_sim,
-            J=args.J,
+            G=args.G,
             n_per_group=args.n_per_group,
             p=args.p,
-            eta=args.eta,
-            M_samples=args.M_samples,
+            beta_true=args.beta_true,
+            G_large=args.G_large,
+            large_replication=args.large_replication,
+            tau=args.tau,
+            sigma=args.sigma,
+            c=args.c,
+            lam=args.lam,
+            outlier_prob=args.outlier_prob,
+            outlier_scale=args.outlier_scale,
+            n_iter=args.n_iter,
+            n_burn_in=args.n_burn_in,
             alpha=args.alpha,
             seed=args.seed,
             verbose=args.verbose,
         )
         # output for tex plots (coordinates are (eta, value))
-        os.makedirs("lmm_output", exist_ok=True)
-        with open("lmm_output/coverage_output.tex", "w", encoding="utf-8") as f:
+        os.makedirs("huber_random_intercept_output", exist_ok=True)
+        with open("huber_random_intercept_output/coverage_output.tex", "w", encoding="utf-8") as f:
             # frequentist
             f.write("frequentist:\n")
             out_freq = (
@@ -418,7 +474,7 @@ if __name__ == "__main__":
                 "{" + " ".join(f"({xi},{yi})" for xi, yi in zip(results["etas"], results["coverage_calibrated"])) + "}"
             )
             f.write(out_calib + "\n")
-        with open("lmm_output/width_output.tex", "w", encoding="utf-8") as f:
+        with open("huber_random_intercept_output/width_output.tex", "w", encoding="utf-8") as f:
             # frequentist
             f.write("frequentist:\n")
             out_freq = (
@@ -442,7 +498,7 @@ if __name__ == "__main__":
                 "{" + " ".join(f"({xi},{yi})" for xi, yi in zip(results["etas"], results["width_calibrated"])) + "}"
             )
             f.write(out_calib + "\n")
-        with open("lmm_output/bias_output.tex", "w", encoding="utf-8") as f:
+        with open("huber_random_intercept_output/bias_output.tex", "w", encoding="utf-8") as f:
             # frequentist
             f.write("frequentist:\n")
             out_freq = (
@@ -466,7 +522,7 @@ if __name__ == "__main__":
                 "{" + " ".join(f"({xi},{yi})" for xi, yi in zip(results["etas"], results["bias_calibrated"])) + "}"
             )
             f.write(out_calib + "\n")
-        with open("lmm_output/bias_sd_output.tex", "w", encoding="utf-8") as f:
+        with open("huber_random_intercept_output/bias_sd_output.tex", "w", encoding="utf-8") as f:
             # frequentist
             f.write("frequentist:\n")
             out_freq = (
@@ -490,6 +546,6 @@ if __name__ == "__main__":
                 "{" + " ".join(f"({xi},{yi})" for xi, yi in zip(results["etas"], results["bias_sd_calibrated"])) + "}"
             )
             f.write(out_calib + "\n")
-        print(
-            "Results written to lmm_output/coverage_output.tex, lmm_output/width_output.tex, lmm_output/bias_output.tex, and lmm_output/bias_sd_output.tex"  # noqa: E501
+        logging.info(
+            "Results written to huber_random_intercept_output/coverage_output.tex, huber_random_intercept_output/width_output.tex, huber_random_intercept_output/bias_output.tex, and huber_random_intercept_output/bias_sd_output.tex"  # noqa: E501
         )
