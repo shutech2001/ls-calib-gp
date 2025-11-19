@@ -22,17 +22,37 @@ poetry env info --path
 ```
 
 ### Executing Simulation
-- `python src/ex_random_intercept.py`
+- `python src/ex_huber_random_intercept.py`
   - `--n_sim` | `--N`
-    - Number of simulations (default: `500`).
-  - `--J`
-    - Number of groups (default: `60`).
+    - Number of simulations (default: `200`).
+  - `--G`
+    - Number of groups (default: `100`).
   - `--n_per_group` | `--NG`
     - Number of observations per group (default: `5`).
   - `--p`
     - Dimension of covariates (default: `1`),
-  - `--M`
-    - Number of samples from the posterior (default: `1000`).
+  - `--beta_true`
+    - True coefficients (default: `2.0`).
+  - `--G_large`
+    - Number of groups for pseudo-true beta (default: `5000`).
+  - `--large_replication`
+    - Number of replications for pseudo-true beta (default: `1000`).
+  - `--tau`
+    - True random intercept variance (default: `1.0`).
+  - `--sigma`
+    - True residual variance (default: `1.0`).
+  - `--c`
+    - Huber tuning parameter (default: `1.0`).
+  - `--lam`
+    - Ridge penalty parameter (default: `0.1`).
+  - `--outlier_prob`
+    - Outlier probability (default: `0.1`).
+  - `--outlier_scale`
+    - Outlier scale (default: `10.0`).
+  - `--n_iter`
+    - Number of Gibbs iterations (default: `1000`).
+  - `--n_burn_in`
+    - Number of burn-in iterations (default: `500`).
   - `--alpha`
     - Significance level (default: `0.05`).
   - `--seed`
@@ -53,9 +73,9 @@ poetry env info --path
         - Number of learning rates (default: `20`).
 
 ### File Description
-- src/random_intercept_lmm
+- src/huber_random_intercept/huber_random_intercept.py
   - class for random intercept linear mixed model with fixed Gaussian prior
-    - this class includes frequentist method (`fit_frequentist_lmm`)
+    - this class includes frequentist method (`fit_frequentist_penalized_ee`)
 
 ## Contact
 
