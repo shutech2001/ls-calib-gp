@@ -1,4 +1,4 @@
-# LSCalibGB
+# Location–Scale Calibration for Generalized Posterior
 Materials for "Location-Scale Calibration for Generalized Posterior"
 
 ## What is This Repository?
@@ -9,7 +9,7 @@ It also contains some experiments presented in the paper.
 ### Requirements and Setup
 ```
 # clone the repository
-git clone git@github.com:shutech2001/LSCalibGB.git
+git clone git@github.com:shutech2001/ls-calib-gp.git
 
 # build the environment with poetry
 poetry install
