@@ -77,6 +77,16 @@ poetry env info --path
   - class for random intercept linear mixed model with fixed Gaussian prior
     - this class includes frequentist method (`fit_frequentist_penalized_ee`)
 
+## Citation
+```
+@article{tamano2025location,
+    author={Tamano, Shu and Tomo, Yui},
+    journal={arXiv preprint arXiv:2511.NNNNN},
+    title={Location–Scale Calibration for Generalized Posteriors},
+    year={2025},
+}
+```
+
 ## Contact
 
 If you have any question, please feel free to contact: stamano@niid.go.jp
