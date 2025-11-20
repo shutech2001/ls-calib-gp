@@ -1,5 +1,5 @@
 # Location–Scale Calibration for Generalized Posterior
-Materials for "Location-Scale Calibration for Generalized Posterior"
+Materials for "[**Location-Scale Calibration for Generalized Posterior**](https://arxiv.org/abs/2511.15320)"
 
 ## What is This Repository?
 
@@ -76,6 +76,16 @@ poetry env info --path
 - src/huber_random_intercept/huber_random_intercept.py
   - class for random intercept linear mixed model with fixed Gaussian prior
     - this class includes frequentist method (`fit_frequentist_penalized_ee`)
+
+## Citation
+```
+@article{tamano2025location,
+    author={Tamano, Shu and Tomo, Yui},
+    journal={arXiv preprint arXiv:2511.15320},
+    title={Location–Scale Calibration for Generalized Posteriors},
+    year={2025},
+}
+```
 
 ## Contact
 
