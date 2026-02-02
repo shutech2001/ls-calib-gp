@@ -360,7 +360,12 @@ if __name__ == "__main__":
         "--n_per_group", "--NG", type=int, default=5, help="Number of observations per group (default: 5)."
     )
     parser.add_argument("--p", type=int, default=1, help="Dimension of covariates (default: 1).")
-    parser.add_argument("--beta_true", type=parse_beta, default="2.0", help="True coefficients (default: 2.0).")
+    parser.add_argument(
+        "--beta_true",
+        type=parse_beta,
+        default=np.array([2.0]),
+        help="True coefficients (default: 2.0).",
+    )
     parser.add_argument(
         "--G_large", type=int, default=5000, help="Number of groups for pseudo-true beta (default: 5000)."
     )
