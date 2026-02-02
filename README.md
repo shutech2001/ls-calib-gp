@@ -71,11 +71,23 @@ poetry env info --path
         - Maximum learning rate (default: `100.0`).
       - `--n_learning_rate` | `--NLR`
         - Number of learning rates (default: `20`).
+- Laplace prior (non-smooth) variant:
+  - `python src/ex_huber_random_intercept_laplace.py`
+    - Arguments are the same as above, except `--lam` is the Laplace (L1) penalty.
+- Composite likelihood + location-scale calibration (Gaussian pairwise):
+  - `python src/ex_composite_gaussian_pairwise.py`
+    - Uses a pairwise composite likelihood and calibrates to the full likelihood via one-step Newton location and scale adjustment.
 
 ### File Description
 - src/huber_random_intercept/huber_random_intercept.py
   - class for random intercept linear mixed model with fixed Gaussian prior
     - this class includes frequentist method (`fit_frequentist_penalized_ee`)
+- src/huber_random_intercept_laplace/huber_random_intercept_laplace.py
+  - class for random intercept linear mixed model with Laplace (L1) prior
+    - this class includes a proximal-gradient frequentist method (`fit_frequentist_penalized_ee`)
+- src/composite_gaussian_pairwise/composite_gaussian_pairwise.py
+  - class for Gaussian process mean inference with pairwise composite likelihood
+    - includes one-step Newton location and scale calibration to the full likelihood
 
 ## Citation
 ```
