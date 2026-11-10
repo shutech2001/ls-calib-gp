@@ -1,21 +1,53 @@
 [project]
 name = "lscalibgb"
 version = "0.1.0"
-description = ""
-authors = [
-    {name = "Shu Tamano"}
-]
+description = "Location-scale calibration for generalized posteriors"
+authors = [{ name = "Shu Tamano" }]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "numpy (>=2.3.4,<3.0.0)",
-    "pandas (>=2.3.3,<3.0.0)",
     "scipy (>=1.16.3,<2.0.0)",
-    "statsmodels (>=0.14.5,<0.15.0)",
-    "matplotlib (>=3.10.9,<4.0.0)",
 ]
+
+[project.scripts]
+lscalibgb-experiment = "run_experiment:main"
+lscalibgb-report = "report_results:main"
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+    { include = "*.py", from = "src" },
+    { include = "energy_gibbs.cpp", from = "src" },
+    { include = "figure_template.tex", from = "src" },
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.1.1"
+ruff = ">=0.14,<1.0"
+mypy = ">=1.18,<2.0"
+flake8 = ">=7.3,<8.0"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "D", "ANN"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["scipy.optimize", "scipy.special"]
+ignore_missing_imports = true
