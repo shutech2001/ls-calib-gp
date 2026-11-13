@@ -209,6 +209,4 @@ __marimo__/
 # env
 .DS_Store
 .vscode/
-
-# output
-*output/
+.flake8

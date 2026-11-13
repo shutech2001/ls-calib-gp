@@ -1,0 +1,183 @@
+\begin{figure}[tbp]
+\centering
+\pgfplotsset{compat=1.18}
+\begin{subfigure}{0.245\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    title={(a)},
+    xlabel={$\log_{10}\eta$},
+    xmode=log,
+    log basis x=10,
+    xmin=0.01,
+    xmax=100,
+    enlarge x limits=0.03,
+    xtick={0.01,0.1,1,10,100},
+    xticklabels={$-2$, $-1$, $0$, $1$, $2$},
+    scaled y ticks=false,
+    scale only axis,
+    width=0.65\linewidth,
+    height=3.0cm,
+    mark size=1.0pt,
+    font=\footnotesize,
+    xlabel style={yshift=1ex},
+    title style={yshift=-0.5ex},
+    ymin=0,
+    ymax=1.05,
+    ytick={0,0.25,0.5,0.75,1},
+    yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2},
+]
+\addplot[gray, dashdotted, mark=none, line width=0.4pt, forget plot]
+coordinates
+{(0.01,0.95) (100,0.95)}
+;
+\addplot[black, solid, mark=none]
+coordinates
+{@@COVERAGE_WALD@@}
+;
+\addplot[black, dashed, mark=square*, mark size=1.0pt, mark options={fill=white}]
+coordinates
+{@@COVERAGE_CAL@@}
+;
+\addplot[black, dotted, mark=diamond*, mark size=1.0pt]
+coordinates
+{@@COVERAGE_RAW@@}
+;
+\end{axis}
+\end{tikzpicture}
+\end{subfigure}%
+\hfill
+\begin{subfigure}{0.245\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    title={(b)},
+    xlabel={$\log_{10}\eta$},
+    xmode=log,
+    log basis x=10,
+    xmin=0.01,
+    xmax=100,
+    enlarge x limits=0.03,
+    xtick={0.01,0.1,1,10,100},
+    xticklabels={$-2$, $-1$, $0$, $1$, $2$},
+    scaled y ticks=false,
+    scale only axis,
+    width=0.65\linewidth,
+    height=3.0cm,
+    mark size=1.0pt,
+    font=\footnotesize,
+    xlabel style={yshift=1ex},
+    title style={yshift=-0.5ex},
+    ymin=0,
+    enlarge y limits={upper,value=0.04},
+    ytick distance=0.5,
+    yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=1},
+]
+\addplot[black, solid, mark=none]
+coordinates
+{@@MEAN_WIDTH_WALD@@}
+;
+\addplot[black, dashed, mark=square*, mark size=1.0pt, mark options={fill=white}]
+coordinates
+{@@MEAN_WIDTH_CAL@@}
+;
+\addplot[black, dotted, mark=diamond*, mark size=1.0pt]
+coordinates
+{@@MEAN_WIDTH_RAW@@}
+;
+\end{axis}
+\end{tikzpicture}
+\end{subfigure}%
+\hfill
+\begin{subfigure}{0.245\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    title={(c)},
+    xlabel={$\log_{10}\eta$},
+    xmode=log,
+    log basis x=10,
+    xmin=0.01,
+    xmax=100,
+    enlarge x limits=0.03,
+    xtick={0.01,0.1,1,10,100},
+    xticklabels={$-2$, $-1$, $0$, $1$, $2$},
+    scaled y ticks=false,
+    scale only axis,
+    width=0.65\linewidth,
+    height=3.0cm,
+    mark size=1.0pt,
+    font=\footnotesize,
+    xlabel style={yshift=1ex},
+    title style={yshift=-0.5ex},
+    enlarge y limits=0.08,
+    ytick distance=0.01,
+    yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2},
+]
+\addplot[gray!60, solid, mark=none, line width=0.3pt, forget plot]
+coordinates
+{(0.01,0) (100,0)}
+;
+\addplot[black, solid, mark=none]
+coordinates
+{@@MEAN_BIAS_WALD@@}
+;
+\addplot[black, dashed, mark=square*, mark size=1.0pt, mark options={fill=white}]
+coordinates
+{@@MEAN_BIAS_CAL@@}
+;
+\addplot[black, dotted, mark=diamond*, mark size=1.0pt]
+coordinates
+{@@MEAN_BIAS_RAW@@}
+;
+\end{axis}
+\end{tikzpicture}
+\end{subfigure}%
+\hfill
+\begin{subfigure}{0.245\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    title={(d)},
+    xlabel={$\log_{10}\eta$},
+    xmode=log,
+    log basis x=10,
+    xmin=0.01,
+    xmax=100,
+    enlarge x limits=0.03,
+    xtick={0.01,0.1,1,10,100},
+    xticklabels={$-2$, $-1$, $0$, $1$, $2$},
+    scaled y ticks=false,
+    scale only axis,
+    width=0.65\linewidth,
+    height=3.0cm,
+    mark size=1.0pt,
+    font=\footnotesize,
+    xlabel style={yshift=1ex},
+    title style={yshift=-0.5ex},
+    enlarge y limits=0.08,
+    ytick distance=0.001,
+    yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=3},
+]
+\addplot[black, solid, mark=none]
+coordinates
+{@@SD_BIAS_WALD@@}
+;
+\addplot[black, dashed, mark=square*, mark size=1.0pt, mark options={fill=white}]
+coordinates
+{@@SD_BIAS_CAL@@}
+;
+\addplot[black, dotted, mark=diamond*, mark size=1.0pt]
+coordinates
+{@@SD_BIAS_RAW@@}
+;
+\end{axis}
+\end{tikzpicture}
+\end{subfigure}%
+\caption{Simulation results for $\beta^{\lambda}$ over the learning-rate grid, using common data sets with $G=100$, $m=5$, and $n=500$.
+Panels show (a) coverage of nominal $95\%$ intervals, (b) mean interval width, (c) mean bias, and (d) standard deviation of the estimation error.
+Solid line: sandwich Wald benchmark; dashed line with squares: calibrated posterior; dotted line with diamonds: uncalibrated posterior.
+The horizontal reference in panel~(a) is $0.95$.
+}
+\label{fig:random-intercept-exp}
+\end{figure}
